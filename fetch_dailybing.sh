@@ -12,10 +12,19 @@ TODAY_STR=$(date +%Y%m%d)
 
 # 用法说明
 usage() {
-    echo "用法: $0 [-d 输出目录] [-j 并发数] YYYYMMDD [YYYYMMDD]"
+    echo "用法: $0 [-d 输出目录] [-j 并发数] [YYYYMMDD] [YYYYMMDD]"
     echo "示例:"
+    echo "  默认下载今天: $0"
     echo "  单日下载到脚本所在目录: $0 20260224"
-    echo "  指定目录和并发数: $0 -d ./bing_images -j 5 20260201 20260228"
+    echo "  指定目录和并发数范围下载: $0 -d ./bing_images -j 5 20260201 20260228"
+    echo "  选项说明:"
+    echo "    -d 目录  指定保存目录（默认为脚本所在目录）"
+    echo "    -j 数字  设置最大并发数（默认为1）"
+    echo "    -h       显示此帮助"
+    echo "  日期参数:"
+    echo "    若省略，默认使用当天 $(date +%Y年%m月%d日)"
+    echo "    提供一个日期：下载该日图片"
+    echo "    提供两个日期：下载该范围内所有图片（包含首尾）"
     exit 1
 }
 
@@ -30,10 +39,15 @@ while getopts "d:j:h" opt; do
 done
 shift $((OPTIND-1))
 
-# 检查日期参数个数
-if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+# --- 修改点：日期参数处理 ---
+# 若没有提供任何日期参数，默认使用今天
+if [ $# -eq 0 ]; then
+    echo "未指定日期，默认使用今天：$TODAY_STR"
+    set -- "$TODAY_STR"
+elif [ $# -gt 2 ]; then
     usage
 fi
+# 现在 $1 和 $2 是日期参数（$2 可选）
 
 # 创建输出目录（如果不存在）
 mkdir -p "$OUTPUT_DIR" || { echo "错误：无法创建目录 $OUTPUT_DIR"; exit 1; }
@@ -131,28 +145,24 @@ download_date() {
     local title=""
     echo "[$date] 正在提取标题..."
 
-    # --- 新增最高优先级方法：从 class="copyright" 的 a 标签提取，并去除括号内容 ---
+    # 最高优先级方法：从 class="copyright" 的 a 标签提取，并去除括号内容
     if [ -z "$title" ]; then
         local raw_title=""
         if command -v pup >/dev/null 2>&1; then
             raw_title=$(curl -s "$title_url" | pup 'div.copyright a text{}' | head -1)
         else
-            # 后备：正则提取 copyright div 中的 a 标签文本
             raw_title=$(curl -s "$title_url" | \
                         grep -o '<div[^>]*class="copyright"[^>]*>.*</div>' | \
                         grep -o '<a[^>]*>.*</a>' | \
                         sed -e 's/<[^>]*>//g' | head -1)
         fi
         if [ -n "$raw_title" ]; then
-            # 去除末尾的括号及内容，例如 " (© Designpics/Adobe Stock)"
-            # 使用 sed 去除最后一个括号及其内容（如果存在）
             title=$(echo "$raw_title" | sed 's/\s*([^)]*)\s*$//')
-            # 如果去除后为空（极少见），则保留原样
             [ -z "$title" ] && title="$raw_title"
         fi
     fi
 
-    # --- 原优先级最高的方法（现在降为第二优先级）：从 class="title" 提取 ---
+    # 第二优先级：从 class="title" 提取
     if [ -z "$title" ]; then
         if command -v pup >/dev/null 2>&1; then
             title=$(curl -s "$title_url" | pup '.title text{}' | head -1)
@@ -163,7 +173,7 @@ download_date() {
         fi
     fi
 
-    # --- 最后尝试的方法：从 class="story-title" 的 strong 标签提取（静默切换） ---
+    # 第三优先级：从 class="story-title" 的 strong 标签提取（静默切换）
     if [ -z "$title" ]; then
         if command -v pup >/dev/null 2>&1; then
             title=$(curl -s "$title_url" | pup '.story-title strong text{}' | head -1)

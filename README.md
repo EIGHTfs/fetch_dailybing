@@ -3,7 +3,7 @@
 一个功能强大的 Shell 脚本，用于批量下载 [dailybing.com](https://dailybing.com) 上的每日故事配图（UHD 版本）。支持单日期、日期范围下载，具备并发控制、断点续传、HTML 实体解码、旧文件重命名、进度显示等高级功能。
 
 ```bash
-./fetch_dailybing.sh [-d 输出目录] [-j 并发数] YYYYMMDD [YYYYMMDD]
+./fetch_dailybing.sh [-d 输出目录] [-j 并发数] [YYYYMMDD] [YYYYMMDD]
  ``` 
 ## 1. 单日期下载（默认设置）
 ```bash
